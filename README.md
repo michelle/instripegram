@@ -4,17 +4,13 @@
 
 Run one viewer:
 
-`cd viewer`
-
-`node server.js`
+`node viewer/server.js`
 
 Viewer should run on port 8000.
 
 Clients should start the recorder.
 
-`cd recorder`
-
-`node server.js`
+`node recorder/server.js`
 
 Recorder should run on port 8500.
 
