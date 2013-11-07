@@ -9,8 +9,9 @@ var codeM;
 
 // Heks
 var counter = 0;
-var DELAY = 5;
-var SERVER = 'http://localhost:8000/image'
+var DELAY = 2;
+var SERVER = 'http://' + window.location.hostname + ':8000/image';
+var GIFSERVER = 'http://' + window.location.hostname + ':8000/gif';
 
 // For compiling JS.
 var testTimeout;
@@ -20,6 +21,9 @@ var pixels = [];
 
 // fn to apply to pixels.
 var imageFilter;
+
+// For giffffs
+var videoShooter;
 
 // Throttle, from UnderscoreJS.
 function throttle(func, wait, options) {
@@ -57,6 +61,7 @@ function fail() {
 // Not showing vendor prefixes or code that works cross-browser.
 navigator.webkitGetUserMedia({video: true}, function(stream) {
   video.src = window.webkitURL.createObjectURL(stream);
+  videoShooter = new VideoShooter(video);
   localMediaStream = stream;
   $('#start').show();
 }, fail);
@@ -95,10 +100,8 @@ function countdown() {
   counter += 1;
   if (counter === DELAY) {
     frame(true);
-    counter = 0;
-    $('#btntext').removeClass('grey');
-    $('#ind').hide().css('opacity', 0);
-  } else {
+  }
+  if (counter < DELAY + 3) {
     $('#ind').show().css('opacity', 1);
     if (counter !== DELAY - 1) {
       setTimeout(function() {
@@ -109,6 +112,50 @@ function countdown() {
       countdown();
     }, 1000);
   }
+  else {
+    counter = 0;
+    $('#btntext').removeClass('grey');
+    $('#ind').hide().css('opacity', 0);
+  }
+}
+
+function VideoShooter (videoElement) {
+  var canvas = document.createElement('canvas');
+  var context = canvas.getContext('2d');
+  context.scale(-1, 1); // mirror flip preview back to the normal direction
+
+  canvas.width = videoElement.width;
+  canvas.height = videoElement.height;
+
+  this.getShot = function (callback, numFrames, interval, progressCallback) {
+    numFrames = numFrames !== undefined ? numFrames : 3;
+    interval = interval !== undefined ? interval : 0.1; // In seconds
+
+    var pendingFrames = numFrames;
+    var ag = new Animated_GIF({ workerPath: 'lib/gif/quantizer.js' });
+    ag.setSize(canvas.width, canvas.height);
+    ag.setDelay(interval);
+
+    captureFrame();
+
+    function captureFrame() {
+      ag.addFrame(videoElement, imageFilter || function(a){return a;});
+      pendingFrames--;
+
+      // Call back with an r value indicating how far along we are in capture
+      progressCallback((numFrames - pendingFrames) / numFrames);
+
+      if(pendingFrames > 0) {
+        setTimeout(captureFrame, interval * 1000); // timeouts are in milliseconds
+      } else {
+        ag.getBase64GIF(function(image) {
+          var img = document.createElement('img');
+          img.src = image;
+          callback(image);
+        });
+      }
+    }
+  };
 }
 
 function frame(send_picture) {
@@ -118,9 +165,14 @@ function frame(send_picture) {
       filterize();
     }
     if (open && send_picture) {
+      videoShooter.getShot(function(base64_gif) {
+        $.post(GIFSERVER, {gif: base64_gif});
+      }, 10, 0.2, $.noop);
+
       // The flash!
       $('#f').css('opacity', 1).animate({'opacity': 0});
-      canvas.toBlob(
+
+      /*canvas.toBlob(
         function(blob) {
           var data = new FormData();
           data.append('image', blob);
@@ -130,7 +182,7 @@ function frame(send_picture) {
           req.send(data);
         },
         'image/jpeg'
-      );
+      );*/
     }
   }
   window.requestAnimationFrame(function() {
