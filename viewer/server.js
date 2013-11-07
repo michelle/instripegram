@@ -12,10 +12,9 @@ var viewer;
 var server = new BinaryServer({port: 9001});
 // Wait for new user connections
 server.on('connection', function(client) {
-  client.on('stream', function(stream, meta){ 
-    if (meta && meta.type == "viewer") {
-      viewer = stream;
-    }
+  console.log('connection');
+  client.on('stream', function(stream, meta){
+    viewer = stream;
   });
 });
 
@@ -39,6 +38,26 @@ app.post('/image', function(req, res) {
     console.log('sending to client...' + name);
     viewer.write(name);
   }
+  res.send(200);
+});
+
+app.post('/gif', function(req, res) {
+  var gif = req.body.gif;
+  fs.writeFile(__dirname + '/static/img/' + (+new Date) + '.gif64', gif , function(err) {
+    if(err) {
+      console.log(err);
+    } else {
+      console.log('Shot Saved.');
+    }
+  });
+  if (viewer) {
+    console.log('sending gif to client...')
+    viewer.write(gif);
+  }
+  else {
+    console.log('no viewer');
+  }
+
   res.send(200);
 });
 
